@@ -1,0 +1,44 @@
+// pts main loop
+// for (int i = 0; i < samples; i++) {                                            // sample loop for orientation
+
+// pts_3d.c, line 259 ff
+step = i * INV_SAMPLE_RATE;                                                       // +1 multiplication
+v_offset = fmod(vertical_p + v_bits_per_second * step, 2 * v_bits_m_1);           // +2 multiplication, +1 addition, +1 modulo
+h_offset = 0;                                                                     
+
+if (v_offset < 0) {                                                               
+  v_offset += 2 * v_bits_m_1;                                                     // +1 multiplication, +1 addition
+ }
+
+if (v_offset > v_bits_m_1) {                                                      
+  v_offset = 2 * v_bits_m_1 - v_offset;                                           // +1 multiplication, +1 subtraction
+  h_offset = h_bits / 2;                                                          // +1 division
+ }
+
+offset =                                                                          
+  (int)fmod(horizontal_p + h_offset + h_bits_per_second * step, h_bits) +         // +2 multiplications, +3 additions, +1 modulo
+  v_offset * h_bits;
+
+// INTERLEAVED VERSION
+for (int ch = 0; ch < channels; ch++) {                                           // CHANNEL TIMES 
+  // need to re-build the gain table
+  // calc table indices
+  gains[ch] = tables[ch * page_size + offset];                                    // +1 multiplication, +1 addition    
+}
+  
+// }
+
+// 7 multiplications + (CHANNELS multiplications)
+// 1 division
+// 6 additions/subtractions + (CHANNELS additions)
+// 2 modulo
+
+// if we count multiplications, division, addition/subtraction and modulo as the "relevant" operations,
+// we'd come out at a worst-case runtime cost (to calculate the final gains dependent on the number of secondary sources)
+// of: 
+
+// 16 + (CHANNELS * 2)
+
+// operations
+
+

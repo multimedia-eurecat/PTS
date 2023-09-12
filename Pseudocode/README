@@ -1,0 +1,2 @@
+These files lay out a more detailled approach to determining the complexity of each approach by using the exact source code and showing where each operation was accounted for.
+The analysis is oriented along the files found in the C folder of this zip file.

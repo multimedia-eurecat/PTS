@@ -1,0 +1,236 @@
+// the main sample loop for vbap
+
+// vbap_extracted.c, line 368
+// for (int i = 0; i < samples; ++i) {                                         // main sample loop for orientation
+
+step = i * INV_SAMPLE_RATE;                                                    // +1 multiplication           1
+
+// vbap_extracted.c, line 375
+if (x_def_ls_dimension == 3) {
+  x_ele = fmod(v_angles_per_second * step + vertical_p, 360.);                 // 3D +1 multiplication, +1 addition, +1 modulo 
+ } else if (x_def_ls_dimension == 2) {
+  x_ele = 0;                                                                   // 2D 
+ }
+
+x_azi = fmod(h_angles_per_second * step + horizontal_p, 360.);                 // +1 multiplication, +1 addition, +1 modulo 
+
+// vbap_extracted.c, line 637ff void vbap_bang(..) {..}
+float g[3];
+long ls[3];
+long i;
+  
+// vbap_extracted.c, line 663ff - void vbap(..) {..}
+float power;
+int i, j, k, gains_modified;
+float small_g;
+float big_sm_g, gtmp[3];
+long winner_set = 0;
+float cartdir[3];
+float new_cartdir[3];
+float new_angle_dir[3];
+long dim = x_dimension;
+long neg_g_am, best_neg_g_am;
+ 
+// atorad is a constant
+cartdir[0] = cos(x_azi * atorad) * cos(x_ele * atorad);                       // +2 trigon, +3 multiplications 
+cartdir[1] = sin(x_azi * atorad) * cos(x_ele * atorad);                       // +2 trigon, +3 multiplications 
+cartdir[2] = sin(ele * atorad);                                               // +1 trigon, +1 multiplication  
+
+/* ... */
+
+// for the deduction of x_lsset_amount, see below ...
+// vbap_extracted.c, line 702
+for (i = 0; i < x_lsset_amount; i++) {                                        // x_lsset_amount times
+  small_g = 10000000.0;                                                       
+  neg_g_am = 3;                                                               
+  for (j = 0; j < dim; j++) {                                                 // dim times ...
+    gtmp[j] = 0.0;                                                            
+    for (k = 0; k < dim; k++) {                                               // dim times ...
+      gtmp[j] += cartdir[k] * x_set_inv_matx[i][k + j * dim];                 // +2 multiplications, +2 additions 
+    } 
+    if (gtmp[j] < small_g) {
+      small_g = gtmp[j];                                                    
+    }
+    if (gtmp[j] >= -0.01) {
+      neg_g_am--;                                                             // +1 increment (not counting)
+    }
+  }
+
+  /* ... */                                                                 // INTERMEDIATE LOOP (not counting increment): 
+ }                                                                           // x_lsset_amount * dim^2 * (2 mul + 2 add)
+
+/* ... */
+  
+// assuming this to be true when modifications happen at audio rate
+// vbap_extracted.c, line 748
+if (gains_modified == 1) {                                                  
+  new_cartdir[0] = x_set_matx[winner_set][0] * g[0] +                       // +3 multiplications, +2 additions 
+    x_set_matx[winner_set][1] * g[1] +
+    x_set_matx[winner_set][2] * g[2];
+  new_cartdir[1] = x_set_matx[winner_set][3] * g[0] +                       // +3 multiplications, +2 additions 
+    x_set_matx[winner_set][4] * g[1] +
+    x_set_matx[winner_set][5] * g[2];
+  if (dim == 3) {
+    new_cartdir[2] = x_set_matx[winner_set][6] * g[0] +                     // 3D +3 multiplications, +2 additions 
+      x_set_matx[winner_set][7] * g[1] +
+      x_set_matx[winner_set][8] * g[2];
+  } else {
+    new_cartdir[2] = 0;                                                     // 2D 
+  }
+
+  float dist, atan_y_per_x, atan_x_pl_y_per_z;
+  float azi, ele;
+
+  if (new_cartdir[0] == 0.0)
+    atan_y_per_x = M_PI / 2;                                                
+  else                                                                      // count worst case here: 
+    atan_y_per_x = atan(new_cartdir[1] / new_cartdir[0]);                   // +1 division, +1 trigon 
+
+  azi = atan_y_per_x / atorad;                                              // +1 division 
+
+  if (new_cartdir[0] < 0.0) {
+    azi += 180.0;                                                           // +1 addition 
+  }
+
+  // vbap_extracted.c, line 504
+  dist =
+    sqrt(new_cartdir[0] * new_cartdir[0] + new_cartdir[1] * new_cartdir[1]); // +2 multiplications, +1 addition, +1 sqrt 
+
+  if (new_cartdir[2] == 0.0) {                          
+    atan_x_pl_y_per_z = 0.0; 
+  } else {                                                                   // count worst case here:
+    atan_x_pl_y_per_z = atan(new_cartdir[2] / dist);                         // +1 division, +1 trigon 
+  }
+    
+  /* ... */
+    
+  ele = atan_x_pl_y_per_z / atorad;                                          // +1 division
+  dist = sqrtf(new_cartdir[0] * new_cartdir[0] +                             // +3 multiplications, +2 additions, +1 sqrt
+	       new_cartdir[1] * new_cartdir[1] +
+	       new_cartdir[2] * new_cartdir[2]);
+
+  new_angle_dir[0] = azi;                                                    
+  new_angle_dir[1] = ele;                                                     
+  new_angle_dir[2] = dist;                                                    
+ 
+  x_azi = (long)(new_angle_dir[0] + 0.5);                                    // +1 addition 
+  x_ele = (long)(new_angle_dir[1] + 0.5);                                    // +1 addition 
+ }
+
+// vbap_extracted.c, line 766
+power = sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);                       // +3 multiplications, +2 additions, +1 sqrt
+
+// the final gains, our objective ...
+g[0] /= power;                                                               // +1 division
+g[1] /= power;                                                               // +1 division 
+g[2] /= power;                                                               // +1 division
+
+/* ... */
+   
+// }
+
+// Thus, to calculate the final gains for one output sample,
+// in relation to the amount of secondary sources, we have:
+
+// 2D case:
+// 23 + (x_lsset_amount * dim^2 * 2) multiplications
+// 7 divisions
+// 13 + (x_lsset_amount * dim^2 * 2) additions
+// 1 modulo
+// 7 trigonometric operation
+// 3 square roots
+
+// 3D case:
+// 27 + (x_lsset_amount * dim^2 * 2) multiplications
+// 7 divisions
+// 16 + (x_lsset_amount * dim^2 * 2) additions
+// 2 modulo
+// 7 trigonometric operations
+// 3 square roots
+
+// if we count multiplications, division, addition/subtraction, modulo and trigonometric calculations as
+// the "relevant" operations, we come out at a worst-case runtime cost per input sample of
+// (including resolution of the x_lsset_amount variable, which is basically the list length of the list of triplets (3D) or tuplets (2D)):
+
+// ========= 2D CASE =============
+
+// 54 + x_lsset_amount * dim^2 * 4
+
+// -- (from vbap_extracted.c, line 897), the +2 is for meta arguments and can be neglected --
+
+// list_length = tuplet_amount * 10;
+
+// -- the tuplet amount is equal to the number of channels, thus: --
+
+// list_length = 10 * channels
+
+// -- (from vbap_extracted.c, line 1402f), list_length is passed as argument 'ac' to vbap_matrix --
+
+// counter = (ac - 2) / (x_dimension * x_dimension*2 + x_dimension);
+// x_lsset_amount=counter;
+
+// -- thus: (the -2 is for meta arguments and can be neglected) --
+
+// x_lsset_amount = list_length / (dim^2 * 2 + dim);
+// x_lsset_amount = 10 * channels / (dim^2 * 2 + dim);
+
+// -- if we substitute the dimension with the actual number: --
+
+// x_lsset_amount = channels
+
+// -- if we substitute 'x_lsset_amount' in the calculation above: --
+
+// 55 + x_lsset_amount * dim^2 * 4
+
+// --- we end up with the final formula: ---
+
+// 55 + 16 * channels
+
+// ========= END 2D CASE =============
+
+
+// ========= 3D CASE =============
+// 62 + x_lsset_amount * dim^2 * 4
+
+// -- (from vbap_extracted.c, line 1289), the +3 is for meta arguments and can be neglected --
+
+// list_length = triplet_amount * 21
+
+// -- in the 3D case, the amount of triplets is (2 * channels - 4), thus: --
+
+// list_length = 42 * channels - 84
+
+// -- (from vbap_extracted.c, line 1402f), list_length is passed as argument 'ac' to vbap_matrix --
+
+// counter = (ac - 2) / (x_dimension * x_dimension*2 + x_dimension);
+// x_lsset_amount=counter;
+
+// -- thus: (the -2 is to extract the meta arguments and can be neglected) --
+
+// x_lsset_amount = list_length / (dim^2 * 2 + dim);
+// x_lsset_amount = (42 * channels - 84) / (dim^2 * 2 + dim);
+
+// -- if we substitute the dimension for the actual number: --
+
+// x_lsset_amount = (42 * channels - 84) / 21;
+
+// if we substitute 'x_lsset_amount' in the calculation above:
+
+// 62 + x_lsset_amount * dim^2 * 4
+// 62 + x_lsset_amount * 36
+// 62 + (42 * channels - 84) * 36 / 21
+// 62 + (42 * channels - 84) * 12 / 7
+// 62 + (1512 * channels - 3024) / 21
+// 62 + 72 * channels - 144
+
+// --- we end up with the final formula: ---
+
+// 72 * channels - 82
+
+// ========= END 3D CASE =============
+
+
+
+
+
+
