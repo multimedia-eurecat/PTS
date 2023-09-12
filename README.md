@@ -16,4 +16,4 @@ Otherwise remove this section.
 
 -----------------------
 
-Copyright 2022 Eurecat
+Copyright 2023 Eurecat
