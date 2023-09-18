@@ -1,7 +1,7 @@
-# Spatial Matrix Synthesis (SM Synthesis, or SMS)
+# Panningtable Synthesis (PTS)
 
-Publication of the code used to measure the metrics when comparing SM synthesis to VBAP.
-Hopefully this code will help the interested reader with their own implementation of SM synthesis.
+Publication of the code used to measure the metrics when comparing PTS to VBAP.
+Hopefully this code will help the interested reader with their own implementation of PTS.
 
 # Dependencies, Installation, and Usage
 
